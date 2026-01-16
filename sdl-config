@@ -1,0 +1,23 @@
+#!/bin/bash
+# Fake sdl-config for webOS PDK cross-compilation
+
+PDK=/home/stark/HPwebOS/PDK
+
+case "$1" in
+    --version)
+        echo "1.2.14"
+        ;;
+    --cflags)
+        echo "-I$PDK/include/SDL -D_GNU_SOURCE=1 -D_REENTRANT"
+        ;;
+    --libs)
+        echo "-L$PDK/device/lib -lSDL"
+        ;;
+    --prefix)
+        echo "$PDK"
+        ;;
+    *)
+        echo "Usage: sdl-config [--version|--cflags|--libs|--prefix]"
+        exit 1
+        ;;
+esac

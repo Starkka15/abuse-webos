@@ -1,0 +1,37 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.la
+*.lo
+.libs/
+.deps/
+abuse
+abuse-tool
+
+# Autotools generated
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache/
+config.h
+config.h.in
+config.log
+config.status
+configure
+depcomp
+install-sh
+libtool
+ltmain.sh
+missing
+stamp-h1
+compile
+
+# IDE
+.vscode/
+*.swp
+*~
+
+# Package artifacts
+*.ipk
+webos-pkg/
