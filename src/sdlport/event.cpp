@@ -50,8 +50,10 @@ struct TouchButton {
 
 // Left side: Fire above movement arrows
 // Right side: Spec/Weap stacked left of Aim stick, Jump below Aim
+// Top left: Menu/Pause button
 static TouchButton touch_buttons[] = {
-    { 10,  448, 100, 100, JK_CTRL_L, 0 },  // Fire - above arrows
+    { 10,   10,  80,  40, JK_ESC,   0 },  // Menu/Pause - top left corner
+    { 10,  448, 100, 100, JK_SPACE, 0 },  // Fire - above arrows (SPACE is default fire key)
     { 10,  558, 100, 100, JK_LEFT,   0 },  // Left
     { 120, 558, 100, 100, JK_RIGHT,  0 },  // Right
     { 230, 558, 100, 100, JK_DOWN,   0 },  // Crouch - right of arrows
@@ -99,12 +101,51 @@ static int point_in_any_button(int x, int y) {
     return 0;
 }
 
+// Track which button is currently being held (for release regardless of position)
+static int active_touch_button = -1;
+
+// Get the key for a button, with dual-mode support for dialogs vs gameplay
+// Button indices: 0=Menu, 1=Fire, 2=Left, 3=Right, 4=Crouch, 5=Special, 6=Weapon, 7=Jump
+static int get_button_key(unsigned int button_index) {
+    int in_gameplay = the_game && playing_state(the_game->state);
+
+    if (in_gameplay) {
+        // Gameplay mode - use normal keys
+        return touch_buttons[button_index].key;
+    } else {
+        // Dialog/menu mode - remap certain buttons for navigation
+        switch (button_index) {
+            case 1:  // Fire -> Enter (confirm/select)
+                return JK_ENTER;
+            case 5:  // Special -> Up (navigate up)
+                return JK_UP;
+            case 6:  // Weapon -> Down (navigate down)
+                return JK_DOWN;
+            default:
+                return touch_buttons[button_index].key;
+        }
+    }
+}
+
 // Handle touch/mouse for buttons, returns key if button hit, 0 otherwise
+// Note: For multi-touch support, we only release a button if the release is ON that button
+// This way, touching the aim stick won't release a held button
 static int check_touch_buttons(int x, int y, int pressed) {
-    for (unsigned int i = 0; i < NUM_TOUCH_BUTTONS; i++) {
-        if (point_in_button(x, y, &touch_buttons[i])) {
-            touch_buttons[i].pressed = pressed;
-            return touch_buttons[i].key;
+    if (pressed) {
+        // On press, check if we hit a button
+        for (unsigned int i = 0; i < NUM_TOUCH_BUTTONS; i++) {
+            if (point_in_button(x, y, &touch_buttons[i])) {
+                touch_buttons[i].pressed = 1;
+                return get_button_key(i);
+            }
+        }
+    } else {
+        // On release, only release if we're releasing ON a button
+        for (unsigned int i = 0; i < NUM_TOUCH_BUTTONS; i++) {
+            if (point_in_button(x, y, &touch_buttons[i]) && touch_buttons[i].pressed) {
+                touch_buttons[i].pressed = 0;
+                return get_button_key(i);
+            }
         }
     }
     return 0;
@@ -112,6 +153,7 @@ static int check_touch_buttons(int x, int y, int pressed) {
 
 // Button colors: R, G, B for each button (matches touch_buttons order)
 static float button_colors[][3] = {
+    { 0.5f, 0.5f, 0.5f },  // Menu - Gray
     { 1.0f, 0.5f, 0.0f },  // Fire - Orange
     { 0.2f, 0.4f, 1.0f },  // Left - Blue
     { 0.2f, 0.4f, 1.0f },  // Right - Blue
@@ -161,8 +203,8 @@ static void get_touch_button_states(Uint8 *keystate) {
                 case JK_LEFT:   sdl_key = SDLK_LEFT; break;
                 case JK_RIGHT:  sdl_key = SDLK_RIGHT; break;
                 case JK_UP:     sdl_key = SDLK_UP; break;
-                case JK_CTRL_L:   sdl_key = SDLK_LCTRL; break;
-                case JK_ALT_L:    sdl_key = SDLK_LALT; break;
+                case JK_SPACE:  sdl_key = SDLK_SPACE; break;
+                case JK_ALT_L:  sdl_key = SDLK_LALT; break;
                 case JK_INSERT: sdl_key = SDLK_INSERT; break;
             }
             if (sdl_key) keystate[sdl_key] = 1;
@@ -330,6 +372,9 @@ void event_handler::get_event( event &ev )
                     mouse->update(ev.mouse_move.x, ev.mouse_move.y, ev.mouse_button);
                 } else {
                     // In gameplay - only aim stick updates mouse position
+                    // Clear mouse buttons to prevent touch from triggering fire via mouse path
+                    ev.mouse_button = 0;
+
                     int mx = (event.type == SDL_MOUSEMOTION) ? event.motion.x : event.button.x;
                     int my = (event.type == SDL_MOUSEMOTION) ? event.motion.y : event.button.y;
 
@@ -356,7 +401,8 @@ void event_handler::get_event( event &ev )
                         ev.mouse_move.x = aim_x;
                         ev.mouse_move.y = aim_y;
                         mouse->update(aim_x, aim_y, ev.mouse_button);
-                    } else if (event.type == SDL_MOUSEBUTTONUP && aim_stick_active) {
+                    } else if (event.type == SDL_MOUSEBUTTONUP && aim_stick_active && in_stick) {
+                        // Only deactivate aim stick if release is in the aim area
                         aim_stick_active = 0;
                     }
                     // In gameplay, block other touches from affecting mouse
@@ -384,6 +430,7 @@ void event_handler::get_event( event &ev )
                         if (touch_key) {
                             ev.key = touch_key;
                             ev.type = EV_KEYRELEASE;
+                            ev.mouse_button = 0;  // Clear mouse button
                             break;
                         }
                     }
@@ -413,6 +460,7 @@ void event_handler::get_event( event &ev )
                         int touch_key = check_touch_buttons(event.button.x, event.button.y, 1);
                         if (touch_key) {
                             ev.key = touch_key;
+                            ev.mouse_button = 0;  // Clear mouse button so it doesn't trigger fire via mouse path
                             ev.type = EV_KEY;
                             break;
                         }
