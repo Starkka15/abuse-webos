@@ -1,0 +1,9 @@
+{
+    "id": "com.abuse.game",
+    "version": "0.8.0",
+    "vendor": "Abuse Team",
+    "type": "game",
+    "main": "abuse",
+    "title": "Abuse",
+    "icon": "icon.png"
+}

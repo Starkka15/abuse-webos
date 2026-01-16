@@ -1,0 +1,7 @@
+Package: com.abuse.game
+Version: 0.8.0
+Section: games
+Architecture: armv7
+Maintainer: Abuse Team
+Description: Abuse - Dark Side-Scrolling Platform Game
+Homepage: http://abuse.zoy.org
